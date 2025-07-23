@@ -2,11 +2,12 @@ alias: Toggle Light with Time-Based Settings (Manual Color Mode)
 mode: single
 fields:
   target_light:
-    name: Target Light
+    name: Target Light(s)
     required: true
     selector:
-      entity:
-        domain: light
+      target:
+        entity:
+          domain: light
   color_mode:
     name: Color Mode
     required: true
@@ -18,8 +19,16 @@ fields:
           - brightness
 sequence:
   - variables:
-      light_entity: "{{ target_light }}"
-      light_state: "{{ states(light_entity) }}"
+      # Handle both raw entity_id string and structured target object
+      raw_ids: >
+        {% if target_light.entity_id is defined %}
+          {{ target_light.entity_id }}
+        {% else %}
+          {{ target_light }}
+        {% endif %}
+      light_entities: "{{ expand(raw_ids) | map(attribute='entity_id') | list }}"
+      primary_entity: "{{ light_entities[0] if light_entities else none }}"
+      light_state: "{{ states(primary_entity) if primary_entity else 'unknown' }}"
       user_mode: "{{ color_mode }}"
       now_time: "{{ now().strftime('%H:%M:%S') }}"
       morning_start: "{{ states('input_datetime.morning_start') }}"
@@ -37,7 +46,7 @@ sequence:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ states(target_light) == 'off' }}"
+            value_template: "{{ light_state == 'off' }}"
         sequence:
           - choose:
               - conditions:
@@ -49,28 +58,28 @@ sequence:
                           - condition: template
                             value_template: "{{ user_mode == 'rgb' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ morning_brightness }}"
                               rgb_color: "{{ morning_rgb }}"
-                            action: light.turn_on
                       - conditions:
                           - condition: template
                             value_template: "{{ user_mode == 'mired' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ morning_brightness }}"
                               color_temp: "{{ morning_color_temp }}"
-                            action: light.turn_on
                       - conditions:
                           - condition: template
                             value_template: "{{ user_mode == 'brightness' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ morning_brightness }}"
-                            action: light.turn_on
               - conditions:
                   - condition: template
                     value_template: "{{ evening_start <= now_time < night_start }}"
@@ -80,28 +89,28 @@ sequence:
                           - condition: template
                             value_template: "{{ user_mode == 'rgb' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ evening_brightness }}"
                               rgb_color: "{{ evening_rgb }}"
-                            action: light.turn_on
                       - conditions:
                           - condition: template
                             value_template: "{{ user_mode == 'mired' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ evening_brightness }}"
                               color_temp: "{{ evening_color_temp }}"
-                            action: light.turn_on
                       - conditions:
                           - condition: template
                             value_template: "{{ user_mode == 'brightness' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ evening_brightness }}"
-                            action: light.turn_on
               - conditions:
                   - condition: template
                     value_template: "{{ now_time >= night_start or now_time < morning_start }}"
@@ -111,29 +120,28 @@ sequence:
                           - condition: template
                             value_template: "{{ user_mode == 'rgb' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ night_brightness }}"
                               rgb_color: "{{ night_rgb }}"
-                            action: light.turn_on
                       - conditions:
                           - condition: template
                             value_template: "{{ user_mode == 'mired' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ night_brightness }}"
                               color_temp: "{{ night_color_temp }}"
-                            action: light.turn_on
                       - conditions:
                           - condition: template
                             value_template: "{{ user_mode == 'brightness' }}"
                         sequence:
-                          - data:
-                              entity_id: "{{ light_entity }}"
+                          - service: light.turn_on
+                            target: "{{ target_light }}"
+                            data:
                               brightness: "{{ night_brightness }}"
-                            action: light.turn_on
     default:
-      - data:
-          entity_id: "{{ light_entity }}"
-        action: light.turn_off
+      - service: light.turn_off
+        target: "{{ target_light }}"

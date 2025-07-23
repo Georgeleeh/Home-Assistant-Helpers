@@ -2,8 +2,8 @@ blueprint:
   name: Hue Switch Controls Two Lights via Script
   description: >
     Handles Hue dimmer switch events (subtypes 1 and 2) and maps them
-    to two different lights using a script that supports brightness, color temp,
-    or RGB color depending on the time of day.
+    to two different lights (or areas) using a script that supports
+    brightness, color temp, or RGB color depending on the time of day.
   domain: automation
   input:
     hue_switch:
@@ -23,7 +23,7 @@ blueprint:
         text:
 
     button_1_light:
-      name: Light for Button 1
+      name: Light or Area for Button 1
       selector:
         target:
           entity:
@@ -39,7 +39,7 @@ blueprint:
             - rgb
 
     button_2_light:
-      name: Light for Button 2
+      name: Light or Area for Button 2
       selector:
         target:
           entity:
