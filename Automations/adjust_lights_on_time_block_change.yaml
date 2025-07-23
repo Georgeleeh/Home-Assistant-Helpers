@@ -1,0 +1,89 @@
+alias: Adjust Lights on Time Block Change
+description: Update lights when a new time block starts
+triggers:
+  - at: input_datetime.morning_start
+    trigger: time
+  - at: input_datetime.evening_start
+    trigger: time
+  - at: input_datetime.night_start
+    trigger: time
+actions:
+  - repeat:
+      for_each: "{{ lights }}"
+      sequence:
+        - variables:
+            light_entity: "{{ repeat.item.entity }}"
+            mode: "{{ repeat.item.mode }}"
+        - condition: template
+          value_template: "{{ is_state(light_entity, 'on') }}"
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ mode == 'rgb' }}"
+              sequence:
+                - data:
+                    entity_id: "{{ light_entity }}"
+                    brightness: "{{ brightness }}"
+                    rgb_color: "{{ rgb }}"
+                  action: light.turn_on
+            - conditions:
+                - condition: template
+                  value_template: "{{ mode == 'mired' }}"
+              sequence:
+                - data:
+                    entity_id: "{{ light_entity }}"
+                    brightness: "{{ brightness }}"
+                    color_temp: "{{ color_temp }}"
+                  action: light.turn_on
+            - conditions:
+                - condition: template
+                  value_template: "{{ mode == 'brightness' }}"
+              sequence:
+                - data:
+                    entity_id: "{{ light_entity }}"
+                    brightness: "{{ brightness }}"
+                  action: light.turn_on
+mode: single
+variables:
+  lights:
+    - entity: light.bedroom_lamp_light
+      mode: brightness
+    - entity: light.bedroom_light_light
+      mode: brightness
+    - entity: light.hallway
+      mode: brightness
+    - entity: light.living_room_lamp_light
+      mode: rgb
+    - entity: light.ikea_of_sweden_tradfri_bulb_gu10_w_400lm_light
+      mode: brightness
+    - entity: light.kitchen_light_2_light_2
+      mode: brightness
+    - entity: light.kitchen_light_3_light_2
+      mode: brightness
+    - entity: light.led_strip_light
+      mode: rgb
+    - entity: light.living_room
+      mode: rgb
+    - entity: light.hallway_light
+      mode: brightness
+    - entity: light.living_room_light
+      mode: rgb
+    - entity: light.office_light_light
+      mode: brightness
+    - entity: light.stairs_light_light
+      mode: brightness
+  now_time: "{{ now().strftime('%H:%M:%S') }}"
+  morning_start: "{{ states('input_datetime.morning_start') }}"
+  evening_start: "{{ states('input_datetime.evening_start') }}"
+  night_start: "{{ states('input_datetime.night_start') }}"
+  current_block: |-
+    {% if morning_start <= now_time < evening_start %}
+      morning
+    {% elif evening_start <= now_time < night_start %}
+      evening
+    {% else %}
+      night
+    {% endif %}
+  brightness: "{{ states('input_number.' ~ current_block ~ '_brightness') | int }}"
+  color_temp: "{{ states('input_number.' ~ current_block ~ '_color_temp') | int }}"
+  rgb: "{{ states('input_text.' ~ current_block ~ '_rgb') | from_json }}"
