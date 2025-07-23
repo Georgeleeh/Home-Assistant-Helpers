@@ -1,87 +1,157 @@
-blueprint:
-  name: Hue Switch Controls Two Lights via Script
-  description: >
-    Handles Hue dimmer switch events (subtypes 1 and 2) and maps them
-    to two different lights (or areas) using a script that supports
-    brightness, color temp, or RGB color depending on the time of day.
-  domain: automation
-  input:
-    hue_switch:
-      name: Hue Switch (optional, for UI reference only)
-      description: Select the Hue switch device (for display/documentation).
-      default: ""
-      selector:
-        device:
-          integration: hue
+alias: Toggle Light with Time-Based Settings (Manual Color Mode)
+mode: single
+fields:
+  target_light:
+    name: Target Light(s)
+    required: true
+    selector:
+      target:
+        entity:
+          domain: light
+  color_mode:
+    name: Color Mode
+    required: true
+    selector:
+      select:
+        options:
+          - rgb
+          - mired
+          - brightness
 
-    switch_device_id:
-      name: Hue Switch Device ID
-      description: >
-        Paste the device_id of the Hue switch.
-        (Find it by listening to `hue_event` in Developer Tools → Events.)
-      selector:
-        text:
-
-    button_1_light:
-      name: Light or Area for Button 1
-      selector:
-        target:
-          entity:
-            domain: light
-
-    button_1_mode:
-      name: Color Mode for Button 1
-      selector:
-        select:
-          options:
-            - brightness
-            - mired
-            - rgb
-
-    button_2_light:
-      name: Light or Area for Button 2
-      selector:
-        target:
-          entity:
-            domain: light
-
-    button_2_mode:
-      name: Color Mode for Button 2
-      selector:
-        select:
-          options:
-            - brightness
-            - mired
-            - rgb
-
-trigger:
-  - platform: event
-    event_type: hue_event
-
-action:
+sequence:
   - variables:
-      expected_device_id: !input switch_device_id
-  - if:
-      - condition: template
-        value_template: >
-          {{ trigger.event.data.device_id == expected_device_id and
-             trigger.event.data.type == 'initial_press' }}
-    then:
-      - choose:
-          - conditions:
-              - condition: template
-                value_template: "{{ trigger.event.data.subtype == 1 }}"
-            sequence:
-              - service: script.toggle_light_with_time_based_settings_using_color_mode
-                data:
-                  target_light: !input button_1_light
-                  color_mode: !input button_1_mode
+      light_entities: >
+        {% if target_light.entity_id is defined %}
+          {{ expand(target_light.entity_id) | map(attribute='entity_id') | list }}
+        {% else %}
+          {{ expand(target_light) | map(attribute='entity_id') | list }}
+        {% endif %}
+      primary_entity: "{{ light_entities[0] if light_entities else none }}"
+      light_state: "{{ states(primary_entity) if primary_entity else 'unknown' }}"
+      user_mode: "{{ color_mode }}"
+      now_time: "{{ now().strftime('%H:%M:%S') }}"
+      morning_start: "{{ states('input_datetime.morning_start') }}"
+      evening_start: "{{ states('input_datetime.evening_start') }}"
+      night_start: "{{ states('input_datetime.night_start') }}"
+      morning_brightness: "{{ states('input_number.morning_brightness') | int }}"
+      evening_brightness: "{{ states('input_number.evening_brightness') | int }}"
+      night_brightness: "{{ states('input_number.night_brightness') | int }}"
+      morning_rgb: "{{ states('input_text.morning_rgb') | from_json }}"
+      evening_rgb: "{{ states('input_text.evening_rgb') | from_json }}"
+      night_rgb: "{{ states('input_text.night_rgb') | from_json }}"
+      morning_color_temp: "{{ states('input_number.morning_color_temp') | int }}"
+      evening_color_temp: "{{ states('input_number.evening_color_temp') | int }}"
+      night_color_temp: "{{ states('input_number.night_color_temp') | int }}"
 
-          - conditions:
-              - condition: template
-                value_template: "{{ trigger.event.data.subtype == 2 }}"
-            sequence:
-              - service: script.toggle_light_with_time_based_settings_using_color_mode
-                data:
-                  target_light: !input button_2_light
-                  color_mode: !input button_2_mode
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ light_state == 'off' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ morning_start <= now_time < evening_start }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'rgb' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ morning_brightness }}"
+                              rgb_color: "{{ morning_rgb }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'mired' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ morning_brightness }}"
+                              color_temp: "{{ morning_color_temp }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'brightness' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ morning_brightness }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ evening_start <= now_time < night_start }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'rgb' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ evening_brightness }}"
+                              rgb_color: "{{ evening_rgb }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'mired' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ evening_brightness }}"
+                              color_temp: "{{ evening_color_temp }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'brightness' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ evening_brightness }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ now_time >= night_start or now_time < morning_start }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'rgb' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ night_brightness }}"
+                              rgb_color: "{{ night_rgb }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'mired' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ night_brightness }}"
+                              color_temp: "{{ night_color_temp }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ user_mode == 'brightness' }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ light_entities }}"
+                            data:
+                              brightness: "{{ night_brightness }}"
+    default:
+      - service: light.turn_off
+        target:
+          entity_id: "{{ light_entities }}"

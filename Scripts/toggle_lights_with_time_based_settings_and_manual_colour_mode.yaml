@@ -2,7 +2,7 @@ alias: Toggle Light with Time-Based Settings (Manual Color Mode)
 mode: single
 fields:
   target_light:
-    name: Target Light(s) or Area(s)
+    name: Target Light(s)
     required: true
     selector:
       target:
@@ -19,22 +19,12 @@ fields:
           - brightness
 sequence:
   - variables:
-      light_entities_from_entities: |
+      light_entities: |
         {% if target_light.entity_id is defined %}
           {{ expand(target_light.entity_id) | map(attribute='entity_id') | list }}
         {% else %}
-          []
+          {{ expand(target_light) | map(attribute='entity_id') | list }}
         {% endif %}
-      light_entities_from_areas: |
-        {% set area_lights = [] %} {% if target_light.area_id is defined %}
-          {% for area_id in target_light.area_id %}
-            {% set entities = area_entities(area_id) | select('match', '^light\.') | list %}
-            {% set area_lights = area_lights + entities %}
-          {% endfor %}
-        {% endif %} {{ area_lights }}
-      light_entities: >
-        {{ (light_entities_from_entities + light_entities_from_areas) | unique |
-        list }}
       primary_entity: "{{ light_entities[0] if light_entities else none }}"
       light_state: "{{ states(primary_entity) if primary_entity else 'unknown' }}"
       user_mode: "{{ color_mode }}"
