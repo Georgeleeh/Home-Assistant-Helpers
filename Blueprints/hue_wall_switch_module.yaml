@@ -1,0 +1,87 @@
+blueprint:
+  name: Hue Switch Controls Two Lights via Script
+  description: >
+    Handles Hue dimmer switch events (subtypes 1 and 2) and maps them
+    to two different lights using a script that supports brightness, color temp,
+    or RGB color depending on the time of day.
+  domain: automation
+  input:
+    hue_switch:
+      name: Hue Switch (optional, for UI reference only)
+      description: Select the Hue switch device (for display/documentation).
+      default: ""
+      selector:
+        device:
+          integration: hue
+
+    switch_device_id:
+      name: Hue Switch Device ID
+      description: >
+        Paste the device_id of the Hue switch.
+        (Find it by listening to `hue_event` in Developer Tools → Events.)
+      selector:
+        text:
+
+    button_1_light:
+      name: Light for Button 1
+      selector:
+        target:
+          entity:
+            domain: light
+
+    button_1_mode:
+      name: Color Mode for Button 1
+      selector:
+        select:
+          options:
+            - brightness
+            - mired
+            - rgb
+
+    button_2_light:
+      name: Light for Button 2
+      selector:
+        target:
+          entity:
+            domain: light
+
+    button_2_mode:
+      name: Color Mode for Button 2
+      selector:
+        select:
+          options:
+            - brightness
+            - mired
+            - rgb
+
+trigger:
+  - platform: event
+    event_type: hue_event
+
+action:
+  - variables:
+      expected_device_id: !input switch_device_id
+  - if:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.device_id == expected_device_id and
+             trigger.event.data.type == 'initial_press' }}
+    then:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.subtype == 1 }}"
+            sequence:
+              - service: script.toggle_light_with_time_based_settings_using_color_mode
+                data:
+                  target_light: !input button_1_light
+                  color_mode: !input button_1_mode
+
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.subtype == 2 }}"
+            sequence:
+              - service: script.toggle_light_with_time_based_settings_using_color_mode
+                data:
+                  target_light: !input button_2_light
+                  color_mode: !input button_2_mode
