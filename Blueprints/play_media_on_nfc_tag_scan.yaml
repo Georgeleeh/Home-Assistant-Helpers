@@ -27,14 +27,29 @@ blueprint:
 
 trigger:
   - platform: state
-    tag_id: !input trigger_tag
+    entity_id: !input trigger_tag
 
 action:
-  - service: media_player.play_media
+  - service: media_player.shuffle_set
+    data:
+      shuffle: false
     target:
       entity_id: !input media_player
+
+  - service: media_player.volume_set
     data:
-      media_content_id: !input media_content
-      media_content_type: music
+      volume_level: 0.5
+    target:
+      entity_id: !input media_player
+
+  - variables:
+      i: !input media_content
+
+  - service: media_player.play_media
+    data:
+      media_content_id: "{{ i.media_content_id }}"
+      media_content_type: "{{ i.media_content_type }}"
+    target:
+      entity_id: !input media_player
 
 mode: single
