@@ -1,0 +1,40 @@
+blueprint:
+  name: Play Media on NFC Tag Scan
+  description: >
+    Scan an NFC tag to play a specific media item through a selected media player.
+    Useful for Sonos favorites, Spotify albums, or local media via media browser.
+  domain: automation
+  input:
+    trigger_tag:
+      name: NFC Tag
+      description: Tag to trigger media playback.
+      selector:
+        entity:
+          domain:
+            - tag
+          multiple: false
+    media_player:
+      name: Media Player
+      description: Media player to use (e.g., Sonos speaker).
+      selector:
+        entity:
+          domain: media_player
+    media_content:
+      name: Media to Play
+      description: Select media from media sources (e.g., Sonos favorites, Spotify, local).
+      selector:
+        media:
+
+trigger:
+  - platform: state
+    tag_id: !input trigger_tag
+
+action:
+  - service: media_player.play_media
+    target:
+      entity_id: !input media_player
+    data:
+      media_content_id: !input media_content
+      media_content_type: music
+
+mode: single
